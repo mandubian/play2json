@@ -14,71 +14,76 @@ object Application extends Controller {
 
   	case class Producer(name:String, place: String)
 
-  	trait Wine {
-      def title:String
-      def year:Int
-      def alcohol:Float
-      def producer:Producer
-      def grapes: Map[String, Float]
-      def nose:List[String]
-      def color:WineColor
+  	case class Wine( 
+      title:String, 
+      year:Int, 
+      alcohol:Float, 
+      producer:Producer, 
+      grapes: Map[String, Float], 
+      nose:List[String],
+      color:WineColor)
+
+
+    implicit object ProducerFormat extends Format[Producer] {
+      def reads(json: JsValue): Producer = Producer(
+        (json \ "name").as[String],
+        (json \ "place").as[String]
+      )
+      def writes(p: Producer): JsValue = JsObject(Map(
+        "name" -> JsString(p.name),
+        "place" -> JsString(p.place)
+        )
+      )      
     }
 
-    case class WhiteWine(
-      override val title:String, 
-      override val year:Int, 
-      override val alcohol:Float, 
-      override val producer:Producer, 
-      override val grapes: Map[String, Float], 
-      override val nose:List[String]) extends Wine {
-      
-      override val color=WHITE
-    }    
+    implicit object WineFormat extends Format[Wine] {
+      def reads(json: JsValue): Wine = new Wine(
+        (json \ "title").as[String],
+        (json \ "year").as[Int],
+        (json \ "alcohol").as[Float],
+        (json \ "producer").as[Producer],
+        (json \ "grapes").as[Map[String,Float]],
+        (json \ "nose").as[List[String]],
+        WineColor.withName((json \ "color").as[String])
+      )
 
-    case class RedWine(
-      override val title:String, 
-      override val year:Int, 
-      override val alcohol:Float, 
-      override val producer:Producer, 
-      override val grapes: Map[String, Float], 
-      override val nose:List[String]) extends Wine {
+      def writes(p: Wine): JsValue = JsObject(Map(
+        "title" -> JsString(p.title),
+        "year" -> JsNumber(BigDecimal(p.year)),
+        "alcohol" -> JsNumber(BigDecimal(p.alcohol)),
+        "producer" -> toJson(p.producer),
+        "grapes" -> JsObject(p.grapes.map{ case (k,v) => (k, JsNumber(BigDecimal(v)))}),
+        "nose" -> JsArray(p.nose.map(JsString(_))),
+        "color" -> JsString(p.color.toString)
+        )
+      )
       
-      override val color=RED
     }
-
-    case class RoseWine(
-      override val title:String, 
-      override val year:Int, 
-      override val alcohol:Float, 
-      override val producer:Producer, 
-      override val grapes: Map[String, Float], 
-      override val nose:List[String]) extends Wine {
-      
-      override val color=ROSE
-    }
-
   	val bourgogne_castagnier = 
-  		WhiteWine(
+  		Wine(
 	  		"Bourgogne", 2009, 12.5F, 
   			Producer("Castagnier", "Morey Saint Denis"),
   			grapes = Map("Pinot Noir" -> 100),
-  			nose = List("cherry", "red fruits", "very light vanilla")
+  			nose = List("cherry", "red fruits", "very light vanilla"),
+        WHITE
   		)
 
   	val chateauneuf_mercier = 
-  		RedWine(
+  		Wine(
 	  		"Chateau du Pape", 2007, 15.5F, 
   			Producer("Mercier", "Courthézon"),
   			grapes = Map("Grenache" -> 80, "Syrah" -> 20),
-  			nose = List("red fruits", "cafe", "woods", "leather", "pepper")
+  			nose = List("red fruits", "cafe", "woods", "leather", "pepper"),
+        RED
   		)
 
     val vin_jaune_letoile = 
-      WhiteWine(
+      Wine(
         "Vin Jaune", 1982, 13F, 
         Producer("L'Etoile", "Arbois"),
         grapes = Map("savagnin" -> 100),
-        nose = List("nuts", "dried fruits", "stone")
+        nose = List("nuts", "dried fruits", "stone"),
+        WHITE
       )  
 
 
@@ -112,18 +117,7 @@ object Application extends Controller {
   	}
   	"""	
   
-    implicit object ProducerFormat extends Format[Producer] {
-      def reads(json: JsValue): Producer = Producer(
-        (json \ "name").as[String],
-        (json \ "place").as[String]
-      )
-      def writes(p: Producer): JsValue = JsObject(Map(
-        "name" -> JsNumber(BigDecimal(p.name)),
-        "place" -> JsString(p.place)
-        )
-      )
-      
-    }
+    
 
   	def strToJson = Action {
   		import play.api.json._
@@ -133,28 +127,12 @@ object Application extends Controller {
    		Ok(json)
   	}
 
-    def structureToJson = Action {
-      import play.api.json._
-
-      val bourgAsMap = Map(
-        "name" -> "Bourgogne",
-        "year" -> 2009, 
-        "alcoohol" -> 12.5F, 
-        "producer" -> Map("name" -> "Castagnier", "place" -> "Morey Saint Denis"),
-        "grapes" -> Map("Pinot Noir" -> 100),
-        "nose" -> List("cherry", "red fruits", "very light vanilla")
-      )
-      //Ok(views.html.index("Your new application is ready."))
-      Ok(toJson(bourgAsMap))
-    }
-
-  	def classToJson = Action {
+    def classToJson = Action {
   		import play.api.json._
 
 
-  		val json = toJson[WhiteWine](bourgogne_castagnier)
     	//Ok(views.html.index("Your new application is ready."))
-    	Ok("test")
+    	Ok(toJson(bourgogne_castagnier))
   	}
   
 }
